@@ -1,40 +1,55 @@
 from lib.experiment import Experiment
-from lib.measurement import Measurement
 import matplotlib.pyplot as plt
+import pandas as pd
+from mesa.datacollection import DataCollector
 
-pops = [50, 100, 150, 200, 300, 350, 400, 450, 500]
-probs = [0.0, 0.5]
+# pops = [50, 100, 150, 200, 300, 350, 400, 450, 500]
+pops = [50, 300, 500, 1000]
+probs = [0.0]
+
+
 for p in probs:
     total_contribution = []
     social_contributions = []
     for s in pops:
-        # print(s, ' students experiment, join chat prob ', p)
+        print(s, ' students experiment, join chat prob ', p)
         exp = Experiment(100)
-        exp.generate_experiment(student_count=s, join_chat_prob=p)
+        model_reporters = {}
+        model_reporters['post_count'] = lambda m: m.get_total_posts()
+        agent_reporters = {}
+        def is_overload(a):
+            if a.post_overloaded or a.chat_overloaded:
+                return 1
+            return 0
+        agent_reporters['overload_count'] = is_overload
+        def is_engaged(a):
+            if a.engaged:
+                return 1
+            return 0
+        agent_reporters['engagement_count'] = is_engaged
+        data_collector = DataCollector(model_reporters = model_reporters, agent_reporters=agent_reporters)
+
+        exp.generate_experiment(student_count=s, join_chat_prob=p, data_collector = data_collector)
         exp.run_experiment()
-        measurement = Measurement(exp)
-        class_stats = measurement.get_class_stats()
-        student_stats, student_data = measurement.get_student_stats()
 
+        model_data = exp.data_collector.get_model_vars_dataframe()
+        agent_data = exp.data_collector.get_agent_vars_dataframe()
 
-        if p == 0.0:
-            label = 'Discussion Board Only Non-Social'
-            label2 = 'Discussion Board Only Social'
-        else:
-            label = 'Discussion Board and Chat Non-Social'
-            label2 = 'Discussion Board and Chat Social'
+        overload_count = agent_data['overload_count']
+        overload_by_step = overload_count.sum(level="Step")
+        engagement_count = agent_data['engagement_count']
+        engagement_by_step = engagement_count.sum(level="Step")
 
-        contribution = student_stats['contrib_post']
-        social_contribution = student_stats['contrib_social_chat'] + student_stats['contrib_social_post']
-        total_contribution.append(contribution)
-        social_contributions.append(social_contribution)
+        posts = model_data['post_count'].diff()
+        avg = pd.rolling_mean(posts, 15)
+        plt.plot(posts)
+        plt.plot(overload_by_step)
+        plt.plot(engagement_by_step)
+        plt.legend()
+        plt.title('Number of New Post Per Period Vs Overloaded Students Count')
+        plt.xlabel('Step')
+        plt.ylabel('Number of Items')
+        plt.legend()
+        plt.savefig('data/' + str(s) + ' stduents-overload.png')
+        plt.clf()
 
-    plt.plot(pops, total_contribution, label=label)
-    plt.plot(pops, social_contributions, label=label2)
-
-    plt.title('Average # Contribution Per Student vs Class Size')
-    plt.xlabel('Number of Students in Class')
-    plt.ylabel('Average # of Contribution')
-    plt.legend()
-
-plt.show()

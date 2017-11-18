@@ -12,9 +12,6 @@ class Course(Model):
         self.chats = {}
         self.discussions = {}
 
-        self.total_chat = 0
-        self.total_social_chat = 0
-
         self.step_count = 0
 
     def step(self):
@@ -54,3 +51,5 @@ class Course(Model):
         else:
             self.discussions[id] += 1
 
+    def get_total_posts(self):
+        return self.discussion_post + self.discussion_social_post + self.chat_count + self.chat_social_count

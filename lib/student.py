@@ -2,8 +2,8 @@ from mesa import Agent
 import numpy as np
 
 class Student(Agent):
-    def __init__(self, id, model, engage_prob = 0.3, join_chat_prob = 0.5, chat_prob = 0.5, post_prob = 0.5,
-                 chat_social_prob = 0.5, post_social_prob =0.1):
+    def __init__(self, id, model, engage_prob = 0.3, join_chat_prob = 0.5, chat_prob = 0.5, post_prob = 0.3,
+                 reduced_post_prob = 0.1, chat_social_prob = 0.5, post_social_prob =0.1, discount = 0.95):
         Agent.__init__(self, id, model)
         self.in_chat = False
         self.in_board = False
@@ -28,6 +28,7 @@ class Student(Agent):
         self.join_chat_prob = join_chat_prob
         self.chat_prob = chat_prob
         self.post_prob = post_prob
+        self.reduced_post_prob = reduced_post_prob
         self.chat_social_prob = chat_social_prob
         self.post_social_prob = post_social_prob
         self.engage_prob = engage_prob
@@ -35,9 +36,14 @@ class Student(Agent):
         self.chat_overload_lim = 50
         self.post_overloaded = False
         self.chat_overloaded = False
+        self.discount = discount
 
 
     def step(self):
+        self.post_overloaded = False
+        self.chat_overloaded = False
+        self.engaged = False
+
         if np.random.rand() < self.engage_prob:
             self.engaged = True
             if np.random.random() < self.join_chat_prob:
@@ -75,11 +81,17 @@ class Student(Agent):
                 self.chats_read += chats
                 self.chats_social_read += social_chats
             else:
+                self.chat_overloaded = True
                 self.overload_chats_read += chats
                 self.overload_chats_social_read += social_chats
 
         elif self.in_board and self.engaged:
-            if (not self.post_overloaded) and (np.random.rand() > self.post_prob):
+            if self.post_overloaded:
+                post_prob = self.post_prob
+            else:
+                post_prob = self.reduced_post_prob
+
+            if (np.random.rand() < post_prob):
                 if np.random.rand() < self.post_social_prob:
                     self.contrib_social_post += 1
                     self.model.post_discussion(self.unique_id, is_social = True)
@@ -90,7 +102,5 @@ class Student(Agent):
     def finish(self):
         self.in_chat = False
         self.in_board = False
-        self.post_overloaded = False
-        self.chat_overloaded = False
-        self.engaged = False
-
+        if self.chat_overloaded or self.post_overloaded:
+            self.engage_prob = self.engage_prob * self.discount
