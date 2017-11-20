@@ -4,7 +4,7 @@ import pandas as pd
 from mesa.datacollection import DataCollector
 
 # pops = [50, 100, 150, 200, 300, 350, 400, 450, 500]
-pops = [50, 300, 500, 1000]
+pops = [50, 100, 200, 300, 500, 1000]
 probs = [0.0]
 
 
@@ -16,20 +16,28 @@ for p in probs:
         exp = Experiment(100)
         model_reporters = {}
         model_reporters['post_count'] = lambda m: m.get_total_posts()
-        agent_reporters = {}
+
         def is_overload(a):
             if a.post_overloaded or a.chat_overloaded:
                 return 1
             return 0
-        agent_reporters['overload_count'] = is_overload
+
+
         def is_engaged(a):
-            if a.engaged:
+            if a.in_chat or a.in_board:
                 return 1
             return 0
+
+        agent_reporters = {}
+        agent_reporters['overload_count'] = is_overload
         agent_reporters['engagement_count'] = is_engaged
         data_collector = DataCollector(model_reporters = model_reporters, agent_reporters=agent_reporters)
 
-        exp.generate_experiment(student_count=s, join_chat_prob=p, data_collector = data_collector)
+        experiment_params = {
+            'join_board_prob': 0.30,
+            'join_chat_prob': 0.0
+        }
+        exp.setup_experiment(student_count=s, student_params = experiment_params, data_collector = data_collector)
         exp.run_experiment()
 
         model_data = exp.data_collector.get_model_vars_dataframe()
@@ -50,6 +58,6 @@ for p in probs:
         plt.xlabel('Step')
         plt.ylabel('Number of Items')
         plt.legend()
-        plt.savefig('data/' + str(s) + ' stduents-overload.png')
+        plt.savefig('data/' + str(s) + ' students-posts-over-time.png')
         plt.clf()
 
